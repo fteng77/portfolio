@@ -1,0 +1,53 @@
+rm(list=ls())
+gc()
+
+##模拟Wt
+set.seed(1234)
+w<-matrix(rnorm(10^5),nrow=10^3)
+wt<-matrix(NA,nrow=nrow(w),ncol=ncol(w))
+for(i in 1:nrow(w))  wt[i,]<-cumsum(w[i,])
+wt<-as.data.frame(wt)
+
+year<-paste("y",c(1:ncol(wt)),sep="")
+colnames(wt)<-year
+
+##赋值
+rho<-0.98 #rho取值
+r<-0.03 #无风险收益率
+sigma<-0.1 #波动率
+mu<-0.05 #期望收益
+kappa<-(mu-r)/sigma #sharp值
+gamma<-0.5*kappa^2 #gamma
+
+Wt<-function(t) sample(wt[,t],1) #随机抽取t时刻的布朗运动
+xi<-function(t) exp(-(r+gamma)*t-kappa*Wt(t))
+
+##ab的取值
+a<-0.01
+b<-0.02
+p<-(r+a)/(r+a-b)
+
+##specail case
+###utility function
+alpha<-0.3
+beta<-0.2
+ita<-0.5
+d0<-(rho-alpha*r-alpha*gamma)/(alpha-1)+alpha^2*gamma/(1-alpha)^2
+
+###difine d1,d2,d3
+d1<-function(s,t,y) (rho-r-gamma)*s+log(p*y)-log(xi(s))-kappa*Wt(t)
+d2<-function(s,t,y) -d1(s,t,y)/sqrt(2*gamma*(s-t))+sqrt(2*gamma*(s-t))*alpha/(1-alpha)
+d3<-function(s,t,y) d1(s,t,y)/sqrt(2*gamma*(s-t))+sqrt(2*gamma*(s-t))
+
+###Cs怎么取值？
+Cs<-1
+
+x.star<-function(t,y){
+  part1<-p*(p*y/alpha)^(1/(alpha-1))
+  part2<-exp(kappa*Wt(t)/(1-alpha)+r*t+(1-2*alpha)*r*t/(1-alpha)^2)
+  part3.fun<-function(s) exp(d0*s)*dnorm(d2(s,t,y))
+  part3<-integrate(part3.fun,lower=t,upper=Inf)
+  part4.fun<-function(s) exp(-r*s)*Cs*dnorm(d3(s,t,y))
+  part4<-p*exp(r*t)*integrate(part4.fun,lower=t,upper=Inf)
+  return(part1*part2*part3+part4)
+}
